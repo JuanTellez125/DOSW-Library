@@ -1,103 +1,94 @@
 package edu.eci.dosw.tdd.core.service;
 
 import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
 import edu.eci.dosw.tdd.core.model.Book;
-import edu.eci.dosw.tdd.core.validator.BookValidator;
+import edu.eci.dosw.tdd.core.repository.BookRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-
+/**
+ * Service layer for Book operations.
+ * Managed by Spring — injected via @Autowired constructor.
+ */
+@Service
 public class BookService {
 
-    // Map: Book -> number of available copies
-    private final Map<Book, Integer> bookCatalog;
-    private final Map<String, Book> bookById;
-    private final BookValidator validator;
+    private final BookRepository bookRepository;
 
-    public BookService() {
-        this.bookCatalog = new HashMap<>();
-        this.bookById = new HashMap<>();
-        this.validator = new BookValidator();
+    @Autowired
+    public BookService(BookRepository bookRepository) {
+        this.bookRepository = bookRepository;
     }
 
     /**
-     * Adds a book to the catalog with a given number of copies.
+     * Adds a new book with the given number of copies.
+     * If the book already exists, the copies are accumulated.
      */
-    public void addBook(Book book, int copies) {
-        validator.validate(book);
+    public Book addBook(Book book, int copies) {
         if (copies <= 0) {
             throw new IllegalArgumentException("Number of copies must be positive.");
         }
-        if (bookById.containsKey(book.getId())) {
-            // Increment copies if already exists
-            Book existing = bookById.get(book.getId());
-            bookCatalog.put(existing, bookCatalog.get(existing) + copies);
-        } else {
-            bookCatalog.put(book, copies);
-            bookById.put(book.getId(), book);
-        }
+        bookRepository.save(book, copies);
+        return book;
     }
 
     /**
      * Returns all books in the catalog.
      */
     public List<Book> getAllBooks() {
-        return new ArrayList<>(bookCatalog.keySet());
+        return bookRepository.findAll();
     }
 
     /**
-     * Finds a book by its ID.
+     * Finds a book by ID or throws BookNotFoundException.
      */
     public Book getBookById(String id) {
-        validator.validateId(id);
-        Book book = bookById.get(id);
-        if (book == null) {
-            throw new BookNotFoundException(id);
-        }
-        return book;
-    }
-
-    /**
-     * Updates the availability of a book.
-     */
-    public void updateAvailability(String bookId, boolean available) {
-        Book book = getBookById(bookId);
-        book.setAvailable(available);
+        return bookRepository.findById(id)
+                .orElseThrow(() -> new BookNotFoundException(id));
     }
 
     /**
      * Returns the number of available copies for a book.
      */
-    public int getAvailableCopies(String bookId) {
-        Book book = getBookById(bookId);
-        return bookCatalog.getOrDefault(book, 0);
+    public int getAvailableCopies(String id) {
+        getBookById(id); // validates existence
+        return bookRepository.getCopies(id);
     }
 
     /**
-     * Decrements available copies when a loan is made.
+     * Updates the availability flag of a book.
      */
-    public void decrementCopy(String bookId) {
-        Book book = getBookById(bookId);
-        int copies = bookCatalog.getOrDefault(book, 0);
-        if (copies <= 0) {
-            throw new edu.eci.dosw.tdd.core.exception.BookNotAvailableException(bookId);
+    public Book updateAvailability(String id, boolean available) {
+        Book book = getBookById(id);
+        book.setAvailable(available);
+        return book;
+    }
+
+    /**
+     * Decrements copies when a loan is created.
+     * Sets available=false when the last copy is taken.
+     */
+    public void decrementCopy(String id) {
+        Book book = getBookById(id);
+        if (bookRepository.getCopies(id) <= 0) {
+            throw new BookNotAvailableException(id);
         }
-        bookCatalog.put(book, copies - 1);
-        if (copies - 1 == 0) {
+        bookRepository.decrementCopies(id);
+        if (bookRepository.getCopies(id) == 0) {
             book.setAvailable(false);
         }
     }
 
     /**
-     * Increments available copies when a book is returned.
+     * Increments copies when a book is returned.
+     * Restores available=true.
      */
-    public void incrementCopy(String bookId) {
-        Book book = getBookById(bookId);
-        int copies = bookCatalog.getOrDefault(book, 0);
-        bookCatalog.put(book, copies + 1);
+    public void incrementCopy(String id) {
+        Book book = getBookById(id);
+        bookRepository.incrementCopies(id);
         book.setAvailable(true);
     }
 }

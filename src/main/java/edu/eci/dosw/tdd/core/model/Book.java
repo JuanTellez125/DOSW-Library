@@ -1,8 +1,8 @@
 package edu.eci.dosw.tdd.core.model;
 
-/**
- * Represents a book in the library system.
- */
+import lombok.Data;
+
+@Data
 public class Book {
 
     private String id;
@@ -10,6 +10,8 @@ public class Book {
     private String author;
     private String isbn;
     private boolean available;
+
+    public Book() {}
 
     public Book(String id, String title, String author, String isbn) {
         this.id = id;
@@ -33,10 +35,4 @@ public class Book {
 
     public boolean isAvailable() { return available; }
     public void setAvailable(boolean available) { this.available = available; }
-
-    @Override
-    public String toString() {
-        return "Book{id='" + id + "', title='" + title + "', author='" + author +
-               "', isbn='" + isbn + "', available=" + available + "}";
-    }
 }

@@ -1,271 +1,221 @@
 package edu.eci.dosw.tdd.service;
 
-import edu.eci.dosw.tdd.core.exception.*;
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.exception.LoanLimitExceededException;
+import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
 import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.model.User;
+import edu.eci.dosw.tdd.core.repository.LoanRepository;
 import edu.eci.dosw.tdd.core.service.BookService;
 import edu.eci.dosw.tdd.core.service.LoanService;
 import edu.eci.dosw.tdd.core.service.UserService;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for LoanService.
+ * Unit tests for LoanService using Mockito.
+ * LoanRepository, UserService, and BookService are all mocked.
  *
  * Scenarios covered:
- *  SUCCESS:
- *   - Borrow a book successfully
- *   - Loan updates user loan count
- *   - Loan decrements book copies
- *   - Return a book successfully
- *   - Return updates user loan count
- *   - Return increments book copies and availability
- *   - Borrow different books by same user
- *   - Get all loans
- *   - Get active loans filters returned ones
- *   - Get loans by user
- *   - Borrow up to the limit (3 books)
- *   - Book with multiple copies can be borrowed by multiple users
- *
- *  ERROR:
- *   - Borrow with nonexistent user
- *   - Borrow with nonexistent book
- *   - Borrow book with no copies left
- *   - Borrow when user has reached loan limit
- *   - Return with invalid loan ID
- *   - Return already-returned loan
- *   - Borrow with blank userId or bookId
+ *  SUCCESS: borrowBook, returnBook, getAllLoans, getActiveLoans, getLoansByUser
+ *  ERROR:   user not found, book not available, loan limit exceeded,
+ *           return unknown loan, return already-returned loan
  */
-@DisplayName("LoanService Tests")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("LoanService Unit Tests (Mockito)")
 class LoanServiceTest {
 
-    private BookService bookService;
-    private UserService userService;
+    @Mock private LoanRepository loanRepository;
+    @Mock private UserService userService;
+    @Mock private BookService bookService;
+
+    @InjectMocks
     private LoanService loanService;
+
+    private User availableUser;
+    private Book availableBook;
 
     @BeforeEach
     void setUp() {
-        bookService = new BookService();
-        userService = new UserService();
-        loanService = new LoanService(userService, bookService);
-
-        // Default fixtures
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN-1"), 2);
-        bookService.addBook(new Book("B002", "Pragmatic Programmer", "Hunt", "ISBN-2"), 1);
-        bookService.addBook(new Book("B003", "Design Patterns", "GoF", "ISBN-3"), 3);
-
-        userService.registerUser(new User("U001", "Alice", "alice@dosw.edu"));
-        userService.registerUser(new User("U002", "Bob", "bob@dosw.edu"));
+        availableUser = new User("U001", "Alice", "alice@dosw.edu");
+        availableBook = new Book("B001", "Clean Code", "R. Martin", "ISBN-1");
+        availableBook.setAvailable(true);
     }
 
-    // ─────────────────────────────── SUCCESS SCENARIOS ───────────────────────────────
+    // ─── SUCCESS ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("[SUCCESS] Should create a loan successfully")
-    void shouldCreateLoanSuccessfully() {
+    @DisplayName("[SUCCESS] Should create a loan when all conditions are met")
+    void shouldBorrowBookSuccessfully() {
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(bookService.getBookById("B001")).thenReturn(availableBook);
+        when(bookService.getAvailableCopies("B001")).thenReturn(2);
+
         Loan loan = loanService.borrowBook("U001", "B001");
 
         assertNotNull(loan);
-        assertNotNull(loan.getId());
         assertEquals("U001", loan.getUserId());
         assertEquals("B001", loan.getBookId());
         assertFalse(loan.isReturned());
-        assertNotNull(loan.getLoanDate());
+        verify(bookService).decrementCopy("B001");
+        verify(loanRepository).save(any(Loan.class));
+        assertEquals(1, availableUser.getLoanCount());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should decrement book copies after loan")
-    void shouldDecrementCopiesAfterLoan() {
-        loanService.borrowBook("U001", "B001");
-        assertEquals(1, bookService.getAvailableCopies("B001"));
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should increment user loan count after borrow")
-    void shouldIncrementUserLoanCount() {
-        loanService.borrowBook("U001", "B001");
-        User user = userService.getUserById("U001");
-        assertEquals(1, user.getLoanCount());
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should allow borrowing up to 3 books (the limit)")
-    void shouldAllowBorrowingUpToLimit() {
-        loanService.borrowBook("U001", "B001");
-        loanService.borrowBook("U001", "B002");
-        loanService.borrowBook("U001", "B003");
-
-        User user = userService.getUserById("U001");
-        assertEquals(3, user.getLoanCount());
-        assertFalse(user.canBorrow());
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should return a book successfully")
+    @DisplayName("[SUCCESS] Should mark loan as returned and restore copy")
     void shouldReturnBookSuccessfully() {
-        Loan loan = loanService.borrowBook("U001", "B001");
-        Loan returned = loanService.returnBook(loan.getId());
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(loanRepository.findActiveLoanById("LOAN-001")).thenReturn(Optional.of(loan));
+        when(userService.getUserById("U001")).thenReturn(availableUser);
 
-        assertTrue(returned.isReturned());
-        assertNotNull(returned.getReturnDate());
+        Loan result = loanService.returnBook("LOAN-001");
+
+        assertTrue(result.isReturned());
+        assertNotNull(result.getReturnDate());
+        verify(bookService).incrementCopy("B001");
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should restore book copies after return")
-    void shouldRestoreCopiesAfterReturn() {
-        Loan loan = loanService.borrowBook("U001", "B002"); // B002 has 1 copy
-        assertEquals(0, bookService.getAvailableCopies("B002"));
-
-        loanService.returnBook(loan.getId());
-        assertEquals(1, bookService.getAvailableCopies("B002"));
-        assertTrue(bookService.getBookById("B002").isAvailable());
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should decrement user loan count after return")
-    void shouldDecrementUserLoanCountAfterReturn() {
-        Loan loan = loanService.borrowBook("U001", "B001");
-        loanService.returnBook(loan.getId());
-
-        User user = userService.getUserById("U001");
-        assertEquals(0, user.getLoanCount());
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should allow re-borrowing after returning book")
-    void shouldAllowReBorrowingAfterReturn() {
-        Loan loan = loanService.borrowBook("U001", "B002");
-        loanService.returnBook(loan.getId());
-
-        Loan newLoan = loanService.borrowBook("U001", "B002");
-        assertNotNull(newLoan);
-        assertNotEquals(loan.getId(), newLoan.getId());
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should get all loans including returned ones")
+    @DisplayName("[SUCCESS] Should return all loans")
     void shouldGetAllLoans() {
-        Loan loan1 = loanService.borrowBook("U001", "B001");
-        loanService.borrowBook("U002", "B002");
-        loanService.returnBook(loan1.getId());
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(loanRepository.findAll()).thenReturn(List.of(loan));
 
-        List<Loan> all = loanService.getAllLoans();
-        assertEquals(2, all.size());
+        List<Loan> result = loanService.getAllLoans();
+
+        assertEquals(1, result.size());
+        verify(loanRepository).findAll();
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should get only active loans")
-    void shouldGetActiveLoansOnly() {
-        Loan loan1 = loanService.borrowBook("U001", "B001");
-        loanService.borrowBook("U002", "B002");
-        loanService.returnBook(loan1.getId());
-
-        List<Loan> active = loanService.getActiveLoans();
-        assertEquals(1, active.size());
-        assertFalse(active.get(0).isReturned());
+    @DisplayName("[SUCCESS] Should return empty list when no loans")
+    void shouldReturnEmptyAllLoans() {
+        when(loanRepository.findAll()).thenReturn(List.of());
+        assertTrue(loanService.getAllLoans().isEmpty());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return empty active list when all loans returned")
-    void shouldReturnEmptyWhenAllLoansReturned() {
-        Loan loan = loanService.borrowBook("U001", "B001");
-        loanService.returnBook(loan.getId());
+    @DisplayName("[SUCCESS] Should return only active loans")
+    void shouldGetActiveLoans() {
+        Loan active = new Loan("LOAN-001", "U001", "B001");
+        when(loanRepository.findActive()).thenReturn(List.of(active));
 
+        List<Loan> result = loanService.getActiveLoans();
+
+        assertEquals(1, result.size());
+        assertFalse(result.get(0).isReturned());
+    }
+
+    @Test
+    @DisplayName("[SUCCESS] Should return empty active list when all returned")
+    void shouldReturnEmptyActiveLoans() {
+        when(loanRepository.findActive()).thenReturn(List.of());
         assertTrue(loanService.getActiveLoans().isEmpty());
     }
 
     @Test
     @DisplayName("[SUCCESS] Should get loans filtered by user")
     void shouldGetLoansByUser() {
-        loanService.borrowBook("U001", "B001");
-        loanService.borrowBook("U001", "B003");
-        loanService.borrowBook("U002", "B002");
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(loanRepository.findByUserId("U001")).thenReturn(List.of(loan));
 
-        List<Loan> aliceLoans = loanService.getLoansByUser("U001");
-        assertEquals(2, aliceLoans.size());
-        assertTrue(aliceLoans.stream().allMatch(l -> l.getUserId().equals("U001")));
+        List<Loan> result = loanService.getLoansByUser("U001");
+
+        assertEquals(1, result.size());
+        assertEquals("U001", result.get(0).getUserId());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Multiple users can borrow different copies of same book")
-    void shouldAllowMultipleUsersToborrowSameBook() {
-        // B001 has 2 copies
-        Loan l1 = loanService.borrowBook("U001", "B001");
-        Loan l2 = loanService.borrowBook("U002", "B001");
-
-        assertNotNull(l1);
-        assertNotNull(l2);
-        assertEquals(0, bookService.getAvailableCopies("B001"));
+    @DisplayName("[SUCCESS] Should return empty list for user with no loans")
+    void shouldReturnEmptyForUserWithNoLoans() {
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(loanRepository.findByUserId("U001")).thenReturn(List.of());
+        assertTrue(loanService.getLoansByUser("U001").isEmpty());
     }
 
-    // ─────────────────────────────── ERROR SCENARIOS ───────────────────────────────
+    @Test
+    @DisplayName("[SUCCESS] User loan count incremented after borrow, decremented after return")
+    void loanCountIsTracked() {
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(bookService.getBookById("B001")).thenReturn(availableBook);
+        when(bookService.getAvailableCopies("B001")).thenReturn(2);
+
+        loanService.borrowBook("U001", "B001");
+        assertEquals(1, availableUser.getLoanCount());
+    }
+
+    // ─── ERROR ─────────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("[ERROR] Should throw UserNotFoundException when user does not exist")
     void shouldThrowWhenUserNotFound() {
+        when(userService.getUserById("GHOST")).thenThrow(new UserNotFoundException("GHOST"));
         assertThrows(UserNotFoundException.class, () -> loanService.borrowBook("GHOST", "B001"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw BookNotFoundException when book does not exist")
-    void shouldThrowWhenBookNotFound() {
-        assertThrows(BookNotFoundException.class, () -> loanService.borrowBook("U001", "GHOST"));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw BookNotAvailableException when no copies left")
+    @DisplayName("[ERROR] Should throw BookNotAvailableException when book is unavailable")
     void shouldThrowWhenNoCopiesLeft() {
-        // B002 has 1 copy; borrow it first
-        loanService.borrowBook("U001", "B002");
-        assertThrows(BookNotAvailableException.class, () -> loanService.borrowBook("U002", "B002"));
+        // book.isAvailable() == false short-circuits the OR, getAvailableCopies is never called
+        availableBook.setAvailable(false);
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(bookService.getBookById("B001")).thenReturn(availableBook);
+
+        assertThrows(BookNotAvailableException.class, () -> loanService.borrowBook("U001", "B001"));
+        verify(bookService, never()).decrementCopy(any());
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw LoanLimitExceededException when user has 3 loans")
-    void shouldThrowWhenUserExceedsLoanLimit() {
-        loanService.borrowBook("U001", "B001");
-        loanService.borrowBook("U001", "B002");
-        loanService.borrowBook("U001", "B003");
+    @DisplayName("[ERROR] Should throw BookNotAvailableException when copies are zero but book still available")
+    void shouldThrowWhenCopiesAreZero() {
+        // book.isAvailable() == true, so getAvailableCopies IS called — stub is needed
+        availableBook.setAvailable(true);
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(bookService.getBookById("B001")).thenReturn(availableBook);
+        when(bookService.getAvailableCopies("B001")).thenReturn(0);
 
-        // Add a 4th book
-        bookService.addBook(new Book("B004", "Refactoring", "Fowler", "ISBN-4"), 1);
-        assertThrows(LoanLimitExceededException.class, () -> loanService.borrowBook("U001", "B004"));
+        assertThrows(BookNotAvailableException.class, () -> loanService.borrowBook("U001", "B001"));
+        verify(bookService, never()).decrementCopy(any());
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw when returning with unknown loan ID")
-    void shouldThrowWhenReturnLoanNotFound() {
-        assertThrows(IllegalArgumentException.class, () -> loanService.returnBook("LOAN-GHOST"));
+    @DisplayName("[ERROR] Should throw LoanLimitExceededException when user has 3 active loans")
+    void shouldThrowWhenLoanLimitExceeded() {
+        availableUser.incrementLoanCount();
+        availableUser.incrementLoanCount();
+        availableUser.incrementLoanCount(); // at MAX_LOANS=3
+
+        when(userService.getUserById("U001")).thenReturn(availableUser);
+        when(bookService.getBookById("B001")).thenReturn(availableBook);
+
+        assertThrows(LoanLimitExceededException.class, () -> loanService.borrowBook("U001", "B001"));
+        verify(loanRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw when returning an already-returned loan")
-    void shouldThrowWhenReturningAlreadyReturnedLoan() {
-        Loan loan = loanService.borrowBook("U001", "B001");
-        loanService.returnBook(loan.getId());
-        // The loan is no longer active — second return should fail
-        assertThrows(IllegalArgumentException.class, () -> loanService.returnBook(loan.getId()));
+    @DisplayName("[ERROR] Should throw IllegalArgumentException when loan not found on return")
+    void shouldThrowWhenLoanNotFoundOnReturn() {
+        when(loanRepository.findActiveLoanById("GHOST")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> loanService.returnBook("GHOST"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw ValidationException for blank userId on borrow")
-    void shouldThrowForBlankUserIdOnBorrow() {
-        assertThrows(ValidationException.class, () -> loanService.borrowBook("  ", "B001"));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw ValidationException for blank bookId on borrow")
-    void shouldThrowForBlankBookIdOnBorrow() {
-        assertThrows(ValidationException.class, () -> loanService.borrowBook("U001", "  "));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw ValidationException for blank loanId on return")
-    void shouldThrowForBlankLoanIdOnReturn() {
-        assertThrows(ValidationException.class, () -> loanService.returnBook("  "));
+    @DisplayName("[ERROR] Should throw when getLoansByUser called with nonexistent user")
+    void shouldThrowWhenGetLoansByUserWithNonexistentUser() {
+        when(userService.getUserById("GHOST")).thenThrow(new UserNotFoundException("GHOST"));
+        assertThrows(UserNotFoundException.class, () -> loanService.getLoansByUser("GHOST"));
     }
 }

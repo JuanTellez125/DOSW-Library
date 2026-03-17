@@ -2,9 +2,6 @@ package edu.eci.dosw.tdd.core.model;
 
 import java.time.LocalDate;
 
-/**
- * Represents a book loan in the library system.
- */
 public class Loan {
 
     private String id;
@@ -14,12 +11,13 @@ public class Loan {
     private LocalDate returnDate;
     private boolean returned;
 
+    public Loan() {}
+
     public Loan(String id, String userId, String bookId) {
         this.id = id;
         this.userId = userId;
         this.bookId = bookId;
         this.loanDate = LocalDate.now();
-        this.returnDate = null;
         this.returned = false;
     }
 
@@ -40,10 +38,4 @@ public class Loan {
 
     public boolean isReturned() { return returned; }
     public void setReturned(boolean returned) { this.returned = returned; }
-
-    @Override
-    public String toString() {
-        return "Loan{id='" + id + "', userId='" + userId + "', bookId='" + bookId +
-               "', loanDate=" + loanDate + ", returned=" + returned + "}";
-    }
 }

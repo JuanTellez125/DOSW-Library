@@ -1,16 +1,15 @@
 package edu.eci.dosw.tdd.core.model;
 
-/**
- * Represents a library user.
- */
 public class User {
+
+    public static final int MAX_LOANS = 3;
 
     private String id;
     private String name;
     private String email;
     private int loanCount;
 
-    public static final int MAX_LOANS = 3;
+    public User() {}
 
     public User(String id, String name, String email) {
         this.id = id;
@@ -31,18 +30,8 @@ public class User {
     public int getLoanCount() { return loanCount; }
     public void setLoanCount(int loanCount) { this.loanCount = loanCount; }
 
-    public boolean canBorrow() {
-        return loanCount < MAX_LOANS;
-    }
+    public boolean canBorrow() { return loanCount < MAX_LOANS; }
 
     public void incrementLoanCount() { this.loanCount++; }
-    public void decrementLoanCount() {
-        if (this.loanCount > 0) this.loanCount--;
-    }
-
-    @Override
-    public String toString() {
-        return "User{id='" + id + "', name='" + name + "', email='" + email +
-               "', loanCount=" + loanCount + "}";
-    }
+    public void decrementLoanCount() { if (this.loanCount > 0) this.loanCount--; }
 }

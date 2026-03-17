@@ -2,203 +2,193 @@ package edu.eci.dosw.tdd.service;
 
 import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
 import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
-import edu.eci.dosw.tdd.core.exception.ValidationException;
 import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.repository.BookRepository;
 import edu.eci.dosw.tdd.core.service.BookService;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
- * Unit tests for BookService.
+ * Unit tests for BookService using Mockito to mock BookRepository.
+ * Spring context is NOT loaded — pure unit tests.
  *
  * Scenarios covered:
- *  SUCCESS:
- *   - Add a book with valid data
- *   - Add multiple copies to existing book
- *   - Get all books
- *   - Get book by valid ID
- *   - Update availability (true / false)
- *   - Decrement copy reduces count
- *   - Increment copy restores count and availability
- *
- *  ERROR:
- *   - Add book with null book object
- *   - Add book with blank fields
- *   - Add book with zero or negative copies
- *   - Get book by null/blank/nonexistent ID
- *   - Decrement copy below zero throws BookNotAvailableException
- *   - Update availability for nonexistent book
+ *  SUCCESS: addBook, getAllBooks, getBookById, getAvailableCopies,
+ *           updateAvailability, decrementCopy (with last-copy case),
+ *           incrementCopy
+ *  ERROR:   addBook with zero/negative copies, getBookById nonexistent,
+ *           decrementCopy with no copies left
  */
-@DisplayName("BookService Tests")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("BookService Unit Tests (Mockito)")
 class BookServiceTest {
 
+    @Mock
+    private BookRepository bookRepository;
+
+    @InjectMocks
     private BookService bookService;
+
+    private Book sampleBook;
 
     @BeforeEach
     void setUp() {
-        bookService = new BookService();
+        sampleBook = new Book("B001", "Clean Code", "R. Martin", "ISBN-1");
     }
 
-    // ─────────────────────────────── SUCCESS SCENARIOS ───────────────────────────────
+    // ─── SUCCESS ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("[SUCCESS] Should add a book successfully")
-    void shouldAddBookSuccessfully() {
-        Book book = new Book("B001", "Clean Code", "Robert C. Martin", "978-0132350884");
-        bookService.addBook(book, 3);
+    @DisplayName("[SUCCESS] Should add book and save to repository")
+    void shouldAddBook() {
+        Book result = bookService.addBook(sampleBook, 3);
 
-        Book found = bookService.getBookById("B001");
-        assertNotNull(found);
-        assertEquals("Clean Code", found.getTitle());
-        assertEquals(3, bookService.getAvailableCopies("B001"));
+        verify(bookRepository).save(sampleBook, 3);
+        assertEquals("B001", result.getId());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should accumulate copies when same book is added twice")
-    void shouldAccumulateCopiesForExistingBook() {
-        Book book = new Book("B001", "Clean Code", "Robert C. Martin", "978-0132350884");
-        bookService.addBook(book, 2);
-        bookService.addBook(book, 3);
+    @DisplayName("[SUCCESS] Should return all books from repository")
+    void shouldGetAllBooks() {
+        when(bookRepository.findAll()).thenReturn(List.of(sampleBook));
 
-        assertEquals(5, bookService.getAvailableCopies("B001"));
+        List<Book> result = bookService.getAllBooks();
+
+        assertEquals(1, result.size());
+        verify(bookRepository).findAll();
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return all books")
-    void shouldReturnAllBooks() {
-        bookService.addBook(new Book("B001", "Book One", "Author A", "ISBN-1"), 1);
-        bookService.addBook(new Book("B002", "Book Two", "Author B", "ISBN-2"), 2);
-
-        List<Book> books = bookService.getAllBooks();
-        assertEquals(2, books.size());
-    }
-
-    @Test
-    @DisplayName("[SUCCESS] Should return empty list when catalog is empty")
-    void shouldReturnEmptyListWhenNoBooksAdded() {
+    @DisplayName("[SUCCESS] Should return empty list when no books exist")
+    void shouldReturnEmptyListWhenNoBooksExist() {
+        when(bookRepository.findAll()).thenReturn(List.of());
         assertTrue(bookService.getAllBooks().isEmpty());
     }
 
     @Test
     @DisplayName("[SUCCESS] Should find book by ID")
     void shouldFindBookById() {
-        bookService.addBook(new Book("B002", "The Pragmatic Programmer", "Hunt & Thomas", "ISBN-2"), 1);
-        Book found = bookService.getBookById("B002");
-        assertEquals("B002", found.getId());
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+
+        Book result = bookService.getBookById("B001");
+
+        assertEquals("B001", result.getId());
+        verify(bookRepository).findById("B001");
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should update book availability to false")
+    @DisplayName("[SUCCESS] Should return available copies")
+    void shouldReturnAvailableCopies() {
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+        when(bookRepository.getCopies("B001")).thenReturn(2);
+
+        int copies = bookService.getAvailableCopies("B001");
+
+        assertEquals(2, copies);
+    }
+
+    @Test
+    @DisplayName("[SUCCESS] Should update availability to false")
     void shouldUpdateAvailabilityToFalse() {
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN"), 2);
-        bookService.updateAvailability("B001", false);
-        assertFalse(bookService.getBookById("B001").isAvailable());
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+
+        Book result = bookService.updateAvailability("B001", false);
+
+        assertFalse(result.isAvailable());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should update book availability to true")
+    @DisplayName("[SUCCESS] Should update availability to true")
     void shouldUpdateAvailabilityToTrue() {
-        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN");
-        bookService.addBook(book, 2);
-        bookService.updateAvailability("B001", false);
-        bookService.updateAvailability("B001", true);
-        assertTrue(bookService.getBookById("B001").isAvailable());
+        sampleBook.setAvailable(false);
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+
+        Book result = bookService.updateAvailability("B001", true);
+
+        assertTrue(result.isAvailable());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should decrement available copies on borrow")
-    void shouldDecrementCopiesOnBorrow() {
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN"), 2);
+    @DisplayName("[SUCCESS] Should decrement copies and set unavailable on last copy")
+    void shouldDecrementAndSetUnavailableOnLastCopy() {
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+        when(bookRepository.getCopies("B001")).thenReturn(1).thenReturn(0);
+
         bookService.decrementCopy("B001");
-        assertEquals(1, bookService.getAvailableCopies("B001"));
+
+        verify(bookRepository).decrementCopies("B001");
+        assertFalse(sampleBook.isAvailable());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should set unavailable when last copy is borrowed")
-    void shouldSetUnavailableWhenLastCopyBorrowed() {
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN"), 1);
+    @DisplayName("[SUCCESS] Should decrement copies without marking unavailable when copies remain")
+    void shouldDecrementCopiesWithoutMarkingUnavailable() {
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+        when(bookRepository.getCopies("B001")).thenReturn(3).thenReturn(2);
+
         bookService.decrementCopy("B001");
-        assertFalse(bookService.getBookById("B001").isAvailable());
-        assertEquals(0, bookService.getAvailableCopies("B001"));
+
+        verify(bookRepository).decrementCopies("B001");
+        assertTrue(sampleBook.isAvailable());
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should increment copies and restore availability on return")
-    void shouldIncrementCopiesOnReturn() {
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN"), 1);
-        bookService.decrementCopy("B001");
+    @DisplayName("[SUCCESS] Should increment copies and restore availability")
+    void shouldIncrementCopiesAndRestoreAvailability() {
+        sampleBook.setAvailable(false);
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+
         bookService.incrementCopy("B001");
-        assertEquals(1, bookService.getAvailableCopies("B001"));
-        assertTrue(bookService.getBookById("B001").isAvailable());
+
+        verify(bookRepository).incrementCopies("B001");
+        assertTrue(sampleBook.isAvailable());
     }
 
-    // ─────────────────────────────── ERROR SCENARIOS ───────────────────────────────
+    // ─── ERROR ─────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("[ERROR] Should throw ValidationException when adding null book")
-    void shouldThrowWhenBookIsNull() {
-        assertThrows(ValidationException.class, () -> bookService.addBook(null, 1));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw when adding book with zero copies")
+    @DisplayName("[ERROR] Should throw IllegalArgumentException when copies is zero")
     void shouldThrowWhenCopiesIsZero() {
-        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN");
-        assertThrows(IllegalArgumentException.class, () -> bookService.addBook(book, 0));
+        assertThrows(IllegalArgumentException.class, () -> bookService.addBook(sampleBook, 0));
+        verify(bookRepository, never()).save(any(), anyInt());
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw when adding book with negative copies")
+    @DisplayName("[ERROR] Should throw IllegalArgumentException when copies is negative")
     void shouldThrowWhenCopiesIsNegative() {
-        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN");
-        assertThrows(IllegalArgumentException.class, () -> bookService.addBook(book, -5));
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"   "})
-    @DisplayName("[ERROR] Should throw ValidationException for blank/null book ID on getById")
-    void shouldThrowForBlankBookId(String id) {
-        assertThrows(ValidationException.class, () -> bookService.getBookById(id));
+        assertThrows(IllegalArgumentException.class, () -> bookService.addBook(sampleBook, -2));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw BookNotFoundException when book ID does not exist")
+    @DisplayName("[ERROR] Should throw BookNotFoundException for unknown ID")
     void shouldThrowBookNotFoundForUnknownId() {
-        assertThrows(BookNotFoundException.class, () -> bookService.getBookById("UNKNOWN"));
+        when(bookRepository.findById("GHOST")).thenReturn(Optional.empty());
+        assertThrows(BookNotFoundException.class, () -> bookService.getBookById("GHOST"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw BookNotAvailableException when decrementing with 0 copies")
-    void shouldThrowWhenDecrementingWithNoCopies() {
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN"), 1);
-        bookService.decrementCopy("B001"); // takes last copy
+    @DisplayName("[ERROR] Should throw BookNotAvailableException when no copies left")
+    void shouldThrowWhenNoCopiesLeft() {
+        when(bookRepository.findById("B001")).thenReturn(Optional.of(sampleBook));
+        when(bookRepository.getCopies("B001")).thenReturn(0);
+
         assertThrows(BookNotAvailableException.class, () -> bookService.decrementCopy("B001"));
+        verify(bookRepository, never()).decrementCopies(any());
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw BookNotFoundException when updating availability on nonexistent book")
-    void shouldThrowWhenUpdatingAvailabilityForNonexistentBook() {
+    @DisplayName("[ERROR] Should throw BookNotFoundException when updating nonexistent book")
+    void shouldThrowWhenUpdatingNonexistentBook() {
+        when(bookRepository.findById("GHOST")).thenReturn(Optional.empty());
         assertThrows(BookNotFoundException.class, () -> bookService.updateAvailability("GHOST", true));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw ValidationException when book has blank title")
-    void shouldThrowWhenBookHasBlankTitle() {
-        Book book = new Book("B001", "  ", "Author", "ISBN");
-        assertThrows(ValidationException.class, () -> bookService.addBook(book, 1));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw ValidationException when book has blank author")
-    void shouldThrowWhenBookHasBlankAuthor() {
-        Book book = new Book("B001", "Title", "", "ISBN");
-        assertThrows(ValidationException.class, () -> bookService.addBook(book, 1));
     }
 }

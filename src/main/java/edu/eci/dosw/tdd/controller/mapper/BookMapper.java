@@ -2,10 +2,13 @@ package edu.eci.dosw.tdd.controller.mapper;
 
 import edu.eci.dosw.tdd.controller.dto.BookDTO;
 import edu.eci.dosw.tdd.core.model.Book;
+import org.springframework.stereotype.Component;
 
 /**
- * Maps between Book domain model and BookDTO.
+ * Maps between the Book domain model and BookDTO.
+ * Registered as a Spring bean via @Component so it can be @Autowired.
  */
+@Component
 public class BookMapper {
 
     public BookDTO toDTO(Book book, int copies) {
@@ -22,6 +25,8 @@ public class BookMapper {
 
     public Book toModel(BookDTO dto) {
         if (dto == null) return null;
-        return new Book(dto.getId(), dto.getTitle(), dto.getAuthor(), dto.getIsbn());
+        Book book = new Book(dto.getId(), dto.getTitle(), dto.getAuthor(), dto.getIsbn());
+        book.setAvailable(dto.isAvailable());
+        return book;
     }
 }

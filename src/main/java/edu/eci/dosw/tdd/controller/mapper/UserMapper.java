@@ -2,10 +2,12 @@ package edu.eci.dosw.tdd.controller.mapper;
 
 import edu.eci.dosw.tdd.controller.dto.UserDTO;
 import edu.eci.dosw.tdd.core.model.User;
+import org.springframework.stereotype.Component;
 
 /**
- * Maps between User domain model and UserDTO.
+ * Maps between the User domain model and UserDTO.
  */
+@Component
 public class UserMapper {
 
     public UserDTO toDTO(User user) {

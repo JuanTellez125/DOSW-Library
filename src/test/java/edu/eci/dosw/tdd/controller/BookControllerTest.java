@@ -1,144 +1,183 @@
 package edu.eci.dosw.tdd.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.eci.dosw.tdd.controller.dto.BookDTO;
+import edu.eci.dosw.tdd.controller.mapper.BookMapper;
 import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
-import edu.eci.dosw.tdd.core.exception.ValidationException;
+import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.exception.GlobalExceptionHandler;
+import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.service.BookService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Unit tests for BookController.
+ * Controller-layer tests for BookController using @WebMvcTest.
+ * Only the web slice is loaded — BookService is mocked with @MockBean.
  *
  * Scenarios covered:
- *  SUCCESS:
- *   - Add a book through controller
- *   - Get all books returns DTOs
- *   - Get book by ID returns correct DTO with copies
- *   - Update availability to false and to true
- *
- *  ERROR:
- *   - Add book with null/blank fields throws ValidationException
- *   - Get book by nonexistent ID throws BookNotFoundException
- *   - Update availability on nonexistent book throws BookNotFoundException
+ *  SUCCESS: POST /api/books (201), GET /api/books (200),
+ *           GET /api/books/{id} (200), PUT /api/books/{id}/availability (200)
+ *  ERROR:   POST with blank fields (400), GET nonexistent book (404),
+ *           PUT nonexistent book (404), POST with missing copies (400)
  */
-@DisplayName("BookController Tests")
+@WebMvcTest(BookController.class)
+@Import({BookMapper.class, GlobalExceptionHandler.class})
+@DisplayName("BookController Web Tests (MockMvc)")
 class BookControllerTest {
 
-    private BookController bookController;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @BeforeEach
-    void setUp() {
-        bookController = new BookController(new BookService());
-    }
+    @Autowired
+    private ObjectMapper objectMapper;
 
-    // ─────────────────────────────── SUCCESS SCENARIOS ───────────────────────────────
+    @MockBean
+    private BookService bookService;
+
+    // ─── SUCCESS ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("[SUCCESS] Should add a book through controller")
-    void shouldAddBookThroughController() {
+    @DisplayName("[SUCCESS] POST /api/books → 201 Created")
+    void shouldCreateBook() throws Exception {
         BookDTO dto = new BookDTO("B001", "Clean Code", "R. Martin", "ISBN-1", true, 3);
-        assertDoesNotThrow(() -> bookController.addBook(dto));
+        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN-1");
+
+        when(bookService.addBook(any(), eq(3))).thenReturn(book);
+        when(bookService.getAvailableCopies("B001")).thenReturn(3);
+
+        mockMvc.perform(post("/api/books")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("B001"))
+                .andExpect(jsonPath("$.title").value("Clean Code"))
+                .andExpect(jsonPath("$.copies").value(3));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return all books as DTOs")
-    void shouldReturnAllBooksAsDTOs() {
-        bookController.addBook(new BookDTO("B001", "Clean Code", "R. Martin", "ISBN-1", true, 2));
-        bookController.addBook(new BookDTO("B002", "Pragmatic Programmer", "Hunt", "ISBN-2", true, 1));
+    @DisplayName("[SUCCESS] GET /api/books → 200 with list")
+    void shouldGetAllBooks() throws Exception {
+        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN-1");
 
-        List<BookDTO> books = bookController.getAllBooks();
+        when(bookService.getAllBooks()).thenReturn(List.of(book));
+        when(bookService.getAvailableCopies("B001")).thenReturn(2);
 
-        assertEquals(2, books.size());
+        mockMvc.perform(get("/api/books"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("B001"));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return correct DTO fields for a book")
-    void shouldReturnCorrectDTOFields() {
-        bookController.addBook(new BookDTO("B001", "Clean Code", "R. Martin", "ISBN-1", true, 3));
+    @DisplayName("[SUCCESS] GET /api/books → 200 with empty list")
+    void shouldReturnEmptyList() throws Exception {
+        when(bookService.getAllBooks()).thenReturn(List.of());
 
-        BookDTO result = bookController.getBookById("B001");
-
-        assertEquals("B001", result.getId());
-        assertEquals("Clean Code", result.getTitle());
-        assertEquals("R. Martin", result.getAuthor());
-        assertEquals("ISBN-1", result.getIsbn());
-        assertEquals(3, result.getCopies());
-        assertTrue(result.isAvailable());
+        mockMvc.perform(get("/api/books"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return empty list when no books added")
-    void shouldReturnEmptyListWhenNoBooksAdded() {
-        assertTrue(bookController.getAllBooks().isEmpty());
+    @DisplayName("[SUCCESS] GET /api/books/{id} → 200 with book")
+    void shouldGetBookById() throws Exception {
+        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN-1");
+
+        when(bookService.getBookById("B001")).thenReturn(book);
+        when(bookService.getAvailableCopies("B001")).thenReturn(2);
+
+        mockMvc.perform(get("/api/books/B001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("B001"))
+                .andExpect(jsonPath("$.author").value("R. Martin"))
+                .andExpect(jsonPath("$.copies").value(2));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should update availability to false")
-    void shouldUpdateAvailabilityToFalse() {
-        bookController.addBook(new BookDTO("B001", "Clean Code", "R. Martin", "ISBN-1", true, 2));
-        assertDoesNotThrow(() -> bookController.updateAvailability("B001", false));
+    @DisplayName("[SUCCESS] PUT /api/books/{id}/availability → 200")
+    void shouldUpdateAvailability() throws Exception {
+        Book book = new Book("B001", "Clean Code", "R. Martin", "ISBN-1");
+        book.setAvailable(false);
 
-        BookDTO result = bookController.getBookById("B001");
-        assertFalse(result.isAvailable());
+        when(bookService.updateAvailability("B001", false)).thenReturn(book);
+        when(bookService.getAvailableCopies("B001")).thenReturn(0);
+
+        mockMvc.perform(put("/api/books/B001/availability")
+                        .param("available", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false));
+    }
+
+    // ─── ERROR ─────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("[ERROR] POST /api/books with blank title → 400")
+    void shouldReturn400ForBlankTitle() throws Exception {
+        BookDTO dto = new BookDTO("B001", "", "R. Martin", "ISBN-1", true, 3);
+
+        mockMvc.perform(post("/api/books")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should update availability to true after setting false")
-    void shouldUpdateAvailabilityToTrue() {
-        bookController.addBook(new BookDTO("B001", "Clean Code", "R. Martin", "ISBN-1", true, 2));
-        bookController.updateAvailability("B001", false);
-        bookController.updateAvailability("B001", true);
+    @DisplayName("[ERROR] POST /api/books with null copies → 400")
+    void shouldReturn400ForNullCopies() throws Exception {
+        BookDTO dto = new BookDTO("B001", "Title", "Author", "ISBN", true, null);
 
-        BookDTO result = bookController.getBookById("B001");
-        assertTrue(result.isAvailable());
+        mockMvc.perform(post("/api/books")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Copies are reflected correctly in DTO after adding book")
-    void shouldReflectCopiesInDTO() {
-        bookController.addBook(new BookDTO("B001", "Clean Code", "R. Martin", "ISBN-1", true, 5));
-        BookDTO result = bookController.getBookById("B001");
-        assertEquals(5, result.getCopies());
-    }
-
-    // ─────────────────────────────── ERROR SCENARIOS ───────────────────────────────
-
-    @Test
-    @DisplayName("[ERROR] Should throw ValidationException when book title is blank")
-    void shouldThrowWhenTitleBlank() {
-        BookDTO dto = new BookDTO("B001", "", "Author", "ISBN", true, 1);
-        assertThrows(ValidationException.class, () -> bookController.addBook(dto));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw ValidationException when book id is blank")
-    void shouldThrowWhenIdBlank() {
-        BookDTO dto = new BookDTO("", "Title", "Author", "ISBN", true, 1);
-        assertThrows(ValidationException.class, () -> bookController.addBook(dto));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw BookNotFoundException when getting nonexistent book")
-    void shouldThrowWhenBookNotFound() {
-        assertThrows(BookNotFoundException.class, () -> bookController.getBookById("GHOST"));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw BookNotFoundException when updating availability on nonexistent book")
-    void shouldThrowWhenUpdatingNonexistentBook() {
-        assertThrows(BookNotFoundException.class, () -> bookController.updateAvailability("GHOST", true));
-    }
-
-    @Test
-    @DisplayName("[ERROR] Should throw when adding book with zero copies")
-    void shouldThrowWhenZeroCopies() {
+    @DisplayName("[ERROR] POST /api/books with copies=0 → 400")
+    void shouldReturn400ForZeroCopies() throws Exception {
         BookDTO dto = new BookDTO("B001", "Title", "Author", "ISBN", true, 0);
-        assertThrows(IllegalArgumentException.class, () -> bookController.addBook(dto));
+
+        mockMvc.perform(post("/api/books")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("[ERROR] GET /api/books/{id} nonexistent → 404")
+    void shouldReturn404ForUnknownBook() throws Exception {
+        when(bookService.getBookById("GHOST")).thenThrow(new BookNotFoundException("GHOST"));
+
+        mockMvc.perform(get("/api/books/GHOST"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("BOOK_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("[ERROR] PUT /api/books/{id}/availability nonexistent → 404")
+    void shouldReturn404WhenUpdatingNonexistentBook() throws Exception {
+        when(bookService.updateAvailability("GHOST", true)).thenThrow(new BookNotFoundException("GHOST"));
+
+        mockMvc.perform(put("/api/books/GHOST/availability")
+                        .param("available", "true"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("BOOK_NOT_FOUND"));
     }
 }

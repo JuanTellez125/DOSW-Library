@@ -1,195 +1,213 @@
 package edu.eci.dosw.tdd.controller;
 
-import edu.eci.dosw.tdd.controller.dto.LoanDTO;
+import edu.eci.dosw.tdd.controller.mapper.LoanMapper;
 import edu.eci.dosw.tdd.core.exception.*;
-import edu.eci.dosw.tdd.core.model.Book;
-import edu.eci.dosw.tdd.core.model.User;
-import edu.eci.dosw.tdd.core.service.BookService;
+import edu.eci.dosw.tdd.core.model.Loan;
 import edu.eci.dosw.tdd.core.service.LoanService;
-import edu.eci.dosw.tdd.core.service.UserService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Unit tests for LoanController.
+ * Controller-layer tests for LoanController using @WebMvcTest.
  *
  * Scenarios covered:
- *  SUCCESS:
- *   - Borrow a book returns a LoanDTO with correct fields
- *   - Return a book marks LoanDTO as returned with returnDate
- *   - Get all loans (active + returned)
- *   - Get active loans filters returned ones
- *   - Get loans by user returns only that user's loans
- *
- *  ERROR:
- *   - Borrow with nonexistent user throws UserNotFoundException
- *   - Borrow with nonexistent book throws BookNotFoundException
- *   - Borrow when no copies left throws BookNotAvailableException
- *   - Borrow when user at loan limit throws LoanLimitExceededException
- *   - Return with invalid loanId throws IllegalArgumentException
- *   - Return already-returned loan throws IllegalArgumentException
+ *  SUCCESS: POST /api/loans (201), PUT /api/loans/{id}/return (200),
+ *           GET /api/loans (200), GET /api/loans/active (200),
+ *           GET /api/loans/user/{userId} (200), empty list cases
+ *  ERROR:   user not found (404), book not available (409),
+ *           loan limit exceeded (422), loan not found (400),
+ *           already returned (400)
  */
-@DisplayName("LoanController Tests")
+@WebMvcTest(LoanController.class)
+@Import({LoanMapper.class, GlobalExceptionHandler.class})
+@DisplayName("LoanController Web Tests (MockMvc)")
 class LoanControllerTest {
 
-    private LoanController loanController;
-    private BookService bookService;
-    private UserService userService;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @BeforeEach
-    void setUp() {
-        bookService = new BookService();
-        userService = new UserService();
-        LoanService loanService = new LoanService(userService, bookService);
-        loanController = new LoanController(loanService);
+    @MockBean
+    private LoanService loanService;
 
-        bookService.addBook(new Book("B001", "Clean Code", "R. Martin", "ISBN-1"), 2);
-        bookService.addBook(new Book("B002", "Pragmatic Programmer", "Hunt", "ISBN-2"), 1);
-        bookService.addBook(new Book("B003", "Design Patterns", "GoF", "ISBN-3"), 3);
-
-        userService.registerUser(new User("U001", "Alice", "alice@dosw.edu"));
-        userService.registerUser(new User("U002", "Bob", "bob@dosw.edu"));
-    }
-
-    // ─────────────────────────────── SUCCESS SCENARIOS ───────────────────────────────
+    // ─── SUCCESS ───────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("[SUCCESS] Should return LoanDTO with correct fields on borrow")
-    void shouldReturnLoanDTOOnBorrow() {
-        LoanDTO dto = loanController.borrowBook("U001", "B001");
+    @DisplayName("[SUCCESS] POST /api/loans → 201 Created")
+    void shouldBorrowBook() throws Exception {
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(loanService.borrowBook("U001", "B001")).thenReturn(loan);
 
-        assertNotNull(dto);
-        assertNotNull(dto.getId());
-        assertEquals("U001", dto.getUserId());
-        assertEquals("B001", dto.getBookId());
-        assertFalse(dto.isReturned());
-        assertNotNull(dto.getLoanDate());
-        assertNull(dto.getReturnDate());
+        mockMvc.perform(post("/api/loans")
+                        .param("userId", "U001")
+                        .param("bookId", "B001"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("LOAN-001"))
+                .andExpect(jsonPath("$.userId").value("U001"))
+                .andExpect(jsonPath("$.bookId").value("B001"))
+                .andExpect(jsonPath("$.returned").value(false));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should mark loan as returned with returnDate set")
-    void shouldMarkLoanAsReturnedWithDate() {
-        LoanDTO loan = loanController.borrowBook("U001", "B001");
-        LoanDTO returned = loanController.returnBook(loan.getId());
+    @DisplayName("[SUCCESS] PUT /api/loans/{id}/return → 200")
+    void shouldReturnBook() throws Exception {
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        loan.setReturned(true);
+        when(loanService.returnBook("LOAN-001")).thenReturn(loan);
 
-        assertTrue(returned.isReturned());
-        assertNotNull(returned.getReturnDate());
+        mockMvc.perform(put("/api/loans/LOAN-001/return"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.returned").value(true));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should get all loans including returned ones")
-    void shouldGetAllLoans() {
-        LoanDTO loan1 = loanController.borrowBook("U001", "B001");
-        loanController.borrowBook("U002", "B002");
-        loanController.returnBook(loan1.getId());
+    @DisplayName("[SUCCESS] GET /api/loans → 200 with all loans")
+    void shouldGetAllLoans() throws Exception {
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(loanService.getAllLoans()).thenReturn(List.of(loan));
 
-        List<LoanDTO> all = loanController.getAllLoans();
-        assertEquals(2, all.size());
+        mockMvc.perform(get("/api/loans"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("LOAN-001"));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should get only active loans")
-    void shouldGetActiveLoans() {
-        LoanDTO loan1 = loanController.borrowBook("U001", "B001");
-        loanController.borrowBook("U002", "B002");
-        loanController.returnBook(loan1.getId());
+    @DisplayName("[SUCCESS] GET /api/loans → 200 empty list")
+    void shouldReturnEmptyAllLoans() throws Exception {
+        when(loanService.getAllLoans()).thenReturn(List.of());
 
-        List<LoanDTO> active = loanController.getActiveLoans();
-        assertEquals(1, active.size());
-        assertFalse(active.get(0).isReturned());
+        mockMvc.perform(get("/api/loans"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return empty active list when no loans exist")
-    void shouldReturnEmptyActiveLoansInitially() {
-        assertTrue(loanController.getActiveLoans().isEmpty());
+    @DisplayName("[SUCCESS] GET /api/loans/active → 200 with active loans")
+    void shouldGetActiveLoans() throws Exception {
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(loanService.getActiveLoans()).thenReturn(List.of(loan));
+
+        mockMvc.perform(get("/api/loans/active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return empty all loans list initially")
-    void shouldReturnEmptyAllLoansInitially() {
-        assertTrue(loanController.getAllLoans().isEmpty());
+    @DisplayName("[SUCCESS] GET /api/loans/active → 200 empty list")
+    void shouldReturnEmptyActiveLoans() throws Exception {
+        when(loanService.getActiveLoans()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/loans/active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should get loans filtered by user")
-    void shouldGetLoansByUser() {
-        loanController.borrowBook("U001", "B001");
-        loanController.borrowBook("U001", "B003");
-        loanController.borrowBook("U002", "B002");
+    @DisplayName("[SUCCESS] GET /api/loans/user/{userId} → 200 with user loans")
+    void shouldGetLoansByUser() throws Exception {
+        Loan loan = new Loan("LOAN-001", "U001", "B001");
+        when(loanService.getLoansByUser("U001")).thenReturn(List.of(loan));
 
-        List<LoanDTO> aliceLoans = loanController.getLoansByUser("U001");
-        assertEquals(2, aliceLoans.size());
-        assertTrue(aliceLoans.stream().allMatch(l -> l.getUserId().equals("U001")));
+        mockMvc.perform(get("/api/loans/user/U001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].userId").value("U001"));
     }
 
     @Test
-    @DisplayName("[SUCCESS] Should return empty list for user with no loans")
-    void shouldReturnEmptyForUserWithNoLoans() {
-        List<LoanDTO> loans = loanController.getLoansByUser("U002");
-        assertTrue(loans.isEmpty());
+    @DisplayName("[SUCCESS] GET /api/loans/user/{userId} → 200 empty list")
+    void shouldReturnEmptyForUserWithNoLoans() throws Exception {
+        when(loanService.getLoansByUser("U002")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/loans/user/U002"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // ─── ERROR ─────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("[ERROR] POST /api/loans with nonexistent user → 404")
+    void shouldReturn404WhenUserNotFound() throws Exception {
+        when(loanService.borrowBook("GHOST", "B001"))
+                .thenThrow(new UserNotFoundException("GHOST"));
+
+        mockMvc.perform(post("/api/loans")
+                        .param("userId", "GHOST")
+                        .param("bookId", "B001"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("USER_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("[SUCCESS] All loans appear after multiple borrows")
-    void shouldAccumulateLoansCorrectly() {
-        loanController.borrowBook("U001", "B001");
-        loanController.borrowBook("U001", "B003");
-        loanController.borrowBook("U002", "B002");
+    @DisplayName("[ERROR] POST /api/loans with nonexistent book → 404")
+    void shouldReturn404WhenBookNotFound() throws Exception {
+        when(loanService.borrowBook("U001", "GHOST"))
+                .thenThrow(new BookNotFoundException("GHOST"));
 
-        assertEquals(3, loanController.getAllLoans().size());
-        assertEquals(3, loanController.getActiveLoans().size());
-    }
-
-    // ─────────────────────────────── ERROR SCENARIOS ───────────────────────────────
-
-    @Test
-    @DisplayName("[ERROR] Should throw UserNotFoundException when user does not exist")
-    void shouldThrowWhenUserNotFound() {
-        assertThrows(UserNotFoundException.class, () -> loanController.borrowBook("GHOST", "B001"));
+        mockMvc.perform(post("/api/loans")
+                        .param("userId", "U001")
+                        .param("bookId", "GHOST"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("BOOK_NOT_FOUND"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw BookNotFoundException when book does not exist")
-    void shouldThrowWhenBookNotFound() {
-        assertThrows(BookNotFoundException.class, () -> loanController.borrowBook("U001", "GHOST"));
+    @DisplayName("[ERROR] POST /api/loans with no copies available → 409")
+    void shouldReturn409WhenBookNotAvailable() throws Exception {
+        when(loanService.borrowBook("U001", "B001"))
+                .thenThrow(new BookNotAvailableException("B001"));
+
+        mockMvc.perform(post("/api/loans")
+                        .param("userId", "U001")
+                        .param("bookId", "B001"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("BOOK_NOT_AVAILABLE"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw BookNotAvailableException when no copies left")
-    void shouldThrowWhenNoCopiesLeft() {
-        loanController.borrowBook("U001", "B002"); // takes last copy
-        assertThrows(BookNotAvailableException.class, () -> loanController.borrowBook("U002", "B002"));
+    @DisplayName("[ERROR] POST /api/loans when user at loan limit → 422")
+    void shouldReturn422WhenLoanLimitExceeded() throws Exception {
+        when(loanService.borrowBook("U001", "B001"))
+                .thenThrow(new LoanLimitExceededException("U001"));
+
+        mockMvc.perform(post("/api/loans")
+                        .param("userId", "U001")
+                        .param("bookId", "B001"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("LOAN_LIMIT_EXCEEDED"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw LoanLimitExceededException when user has 3 active loans")
-    void shouldThrowWhenLoanLimitExceeded() {
-        loanController.borrowBook("U001", "B001");
-        loanController.borrowBook("U001", "B002");
-        loanController.borrowBook("U001", "B003");
+    @DisplayName("[ERROR] PUT /api/loans/{id}/return with unknown loan → 400")
+    void shouldReturn400WhenLoanNotFound() throws Exception {
+        when(loanService.returnBook("GHOST"))
+                .thenThrow(new IllegalArgumentException("Active loan with id 'GHOST' not found."));
 
-        bookService.addBook(new Book("B004", "Refactoring", "Fowler", "ISBN-4"), 1);
-        assertThrows(LoanLimitExceededException.class, () -> loanController.borrowBook("U001", "B004"));
+        mockMvc.perform(put("/api/loans/GHOST/return"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
     }
 
     @Test
-    @DisplayName("[ERROR] Should throw IllegalArgumentException when returning unknown loan")
-    void shouldThrowWhenReturningUnknownLoan() {
-        assertThrows(IllegalArgumentException.class, () -> loanController.returnBook("LOAN-GHOST"));
-    }
+    @DisplayName("[ERROR] GET /api/loans/user/{userId} with nonexistent user → 404")
+    void shouldReturn404WhenGetLoansByNonexistentUser() throws Exception {
+        when(loanService.getLoansByUser("GHOST"))
+                .thenThrow(new UserNotFoundException("GHOST"));
 
-    @Test
-    @DisplayName("[ERROR] Should throw IllegalArgumentException when returning already-returned loan")
-    void shouldThrowWhenReturningAlreadyReturnedLoan() {
-        LoanDTO loan = loanController.borrowBook("U001", "B001");
-        loanController.returnBook(loan.getId());
-        assertThrows(IllegalArgumentException.class, () -> loanController.returnBook(loan.getId()));
+        mockMvc.perform(get("/api/loans/user/GHOST"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("USER_NOT_FOUND"));
     }
 }
