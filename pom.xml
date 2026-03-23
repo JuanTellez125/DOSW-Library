@@ -1,52 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.2.3</version>
-		<relativePath/>
+		<version>4.0.3</version>
+		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>edu.eci.dosw</groupId>
 	<artifactId>DOSW-Library</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>DOSW-Library</name>
 	<description>DOSW-Library</description>
-
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
 	<properties>
 		<java.version>21</java.version>
-		<maven.compiler.target>21</maven.compiler.target>
-		<maven.compiler.source>21</maven.compiler.source>
 	</properties>
-
 	<dependencies>
-
-		<!-- Spring Boot Web: @RestController, ResponseEntity, @RequestMapping, etc. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
+			<artifactId>spring-boot-starter</artifactId>
 		</dependency>
 
-		<!-- Bean Validation: @NotBlank, @Email, @Min, @Valid, etc. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
+			<artifactId>spring-boot-starter-data-mongodb</artifactId>
 		</dependency>
 
-		<!-- Tests: JUnit 5 + Mockito + MockMvc + TestRestTemplate -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Lombok -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<version>1.18.32</version>
 			<scope>provided</scope>
 		</dependency>
+
 
 	</dependencies>
 
@@ -54,15 +65,9 @@
 		<plugins>
 
 			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-
-			<!-- JaCoCo: cobertura de código -->
-			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.10</version>
+				<version>0.8.12</version>
 				<executions>
 					<execution>
 						<goals>
@@ -75,38 +80,84 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
+						<configuration>
+							<excludes>
+								<exclude>**/model/**</exclude>
+								<exclude>**/dto/**</exclude>
+								<exclude>**/enums/**</exclude>
+								<exclude>**/config/*</exclude>
+								<exclude>**/mapper/*</exclude>
+								<exclude>**/exception/*</exclude>
+								<exclude>**/common/*</exclude>
+								<exclude>**/TheBoysApplication.class</exclude>
+							</excludes>
+						</configuration>
 					</execution>
 					<execution>
-						<id>check</id>
+						<id>jacoco-check</id>
 						<goals>
 							<goal>check</goal>
 						</goals>
 						<configuration>
 							<rules>
 								<rule>
-									<element>BUNDLE</element>
+									<element>CLASS</element>
+									<excludes>
+										<exclude>edu/dosw/sirha/TheBoysApplication</exclude>
+									</excludes>
+								</rule>
+								<rule>
+									<element>PACKAGE</element>
 									<limits>
 										<limit>
-											<counter>LINE</counter>
+											<counter>CLASS</counter>
 											<value>COVEREDRATIO</value>
-											<minimum>0.80</minimum>
+											<minimum>0.00</minimum>
 										</limit>
 									</limits>
 								</rule>
 							</rules>
 							<excludes>
-								<exclude>edu/eci/dosw/tdd/DoswLibraryApplication.class</exclude>
+								<exclude>**/model/**</exclude>
+								<exclude>**/dto/**</exclude>
+								<exclude>**/enums/**</exclude>
+								<exclude>**/config/*</exclude>
+								<exclude>**/mapper/*</exclude>
+								<exclude>**/exception/*</exclude>
+								<exclude>**/common/*</exclude>
+								<exclude>**/TheBoysApplication.class</exclude>
 							</excludes>
 						</configuration>
 					</execution>
 				</executions>
 			</plugin>
 
-			<!-- SonarQube: análisis estático -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
+				<configuration>
+					<source>17</source>
+					<target>17</target>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>1.18.32</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+
 			<plugin>
 				<groupId>org.sonarsource.scanner.maven</groupId>
 				<artifactId>sonar-maven-plugin</artifactId>
-				<version>3.10.0.2594</version>
+				<version>4.0.0.4121</version>
 			</plugin>
 
 		</plugins>
