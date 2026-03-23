@@ -3,14 +3,16 @@ package edu.eci.dosw.tdd.core.model;
 import lombok.Builder;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
 
+@Document(collection = "users")
 @Data
 @Builder
 public class User {
 
-    private String name;
-
     @Id
     private String id;
+
+    private String name;
 
 }

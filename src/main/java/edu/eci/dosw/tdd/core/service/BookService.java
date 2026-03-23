@@ -4,8 +4,10 @@ import edu.eci.dosw.tdd.controller.dto.request.BookRequestDTO;
 import edu.eci.dosw.tdd.controller.dto.response.BookResponseDTO;
 import edu.eci.dosw.tdd.controller.mapper.BookMapper;
 import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
+import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
 import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.repository.BookRepository;
+import edu.eci.dosw.tdd.core.validator.BookValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,18 +22,19 @@ public class BookService {
 
     private final BookRepository bookRepository;
     private final BookMapper bookMapper;
+    private final BookValidator bookValidator;
 
     @Transactional
     public BookResponseDTO createBook(BookRequestDTO dto) {
+        bookValidator.validate(dto.getTitle(), dto.getAuthor()); // ← agregar
         Book book = bookMapper.toEntity(dto);
-        Book savedBook = bookRepository.save(book);
-        return bookMapper.toDto(savedBook);
+        return bookMapper.toDto(bookRepository.save(book));
     }
 
     @Transactional
     public BookResponseDTO updateBook(String title, BookRequestDTO dto) {
         Book book = bookRepository.findByTitle(title)
-                .orElseThrow(() -> new BookNotAvailableException("Libro no encontrado: " + title));
+                .orElseThrow(() -> new BookNotFoundException("Book with the title '" + title + "' does not found"));
 
         book.setTitle(dto.getTitle());
         book.setAuthor(dto.getAuthor());
@@ -43,7 +46,7 @@ public class BookService {
     @Transactional
     public void deleteBook(String id) {
         Book book = bookRepository.findById(id)
-                .orElseThrow(() -> new BookNotAvailableException("Libro no encontrado con id: " + id));
+                .orElseThrow(() -> new BookNotFoundException("Book with the id " + id + " does not exist"));
 
         bookRepository.delete(book);
     }

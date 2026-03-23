@@ -7,64 +7,64 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
-/**
- * Global exception handler — intercepts all exceptions thrown by controllers
- * and returns structured JSON error responses with the appropriate HTTP status.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    public record ErrorResponse(
-            String errorCode,
-            String message,
-            int status,
-            LocalDateTime timestamp
-    ) {}
-
     @ExceptionHandler(BookNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleBookNotFound(BookNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse("BOOK_NOT_FOUND", ex.getMessage(), 404, LocalDateTime.now()));
+    public ResponseEntity<Map<String, Object>> handleBookNotFound(BookNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, "Book not found", ex.getMessage());
     }
 
     @ExceptionHandler(BookNotAvailableException.class)
-    public ResponseEntity<ErrorResponse> handleBookNotAvailable(BookNotAvailableException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse("BOOK_NOT_AVAILABLE", ex.getMessage(), 409, LocalDateTime.now()));
-    }
-
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse("USER_NOT_FOUND", ex.getMessage(), 404, LocalDateTime.now()));
+    public ResponseEntity<Map<String, Object>> handleBookNotAvailable(BookNotAvailableException ex) {
+        return buildResponse(HttpStatus.CONFLICT, "Book not available", ex.getMessage());
     }
 
     @ExceptionHandler(LoanLimitExceededException.class)
-    public ResponseEntity<ErrorResponse> handleLoanLimit(LoanLimitExceededException ex) {
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(new ErrorResponse("LOAN_LIMIT_EXCEEDED", ex.getMessage(), 422, LocalDateTime.now()));
+    public ResponseEntity<Map<String, Object>> handleLoanLimitExceeded(LoanLimitExceededException ex) {
+        return buildResponse(HttpStatus.CONFLICT, "Loan limit exceeded", ex.getMessage());
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("BAD_REQUEST", ex.getMessage(), 400, LocalDateTime.now()));
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFound(UserNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, "User not found", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
-                .collect(Collectors.joining("; "));
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("VALIDATION_ERROR", message, 400, LocalDateTime.now()));
+    public ResponseEntity<Map<String, Object>> handleValidationErrors(MethodArgumentNotValidException ex) {
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors()
+                .forEach(error -> fieldErrors.put(error.getField(), error.getDefaultMessage()));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Validation failed");
+        body.put("fields", fieldErrors);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "Invalid argument", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse("INTERNAL_ERROR", ex.getMessage(), 500, LocalDateTime.now()));
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", ex.getMessage());
     }
+
+    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String error, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", status.value());
+        body.put("error", error);
+        body.put("message", message);
+        return ResponseEntity.status(status).body(body);
+    }
+
 }
