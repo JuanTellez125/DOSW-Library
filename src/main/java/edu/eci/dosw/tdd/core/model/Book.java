@@ -15,6 +15,6 @@ public class Book {
     private String author;
 
     @Id
-    private String ID;
+    private String id;
 
 }

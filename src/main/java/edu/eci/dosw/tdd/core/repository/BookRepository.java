@@ -9,6 +9,5 @@ public interface BookRepository extends MongoRepository<Book,String> {
 
     Optional<Book> findByTitle(String title);
     Optional<Book> findByAuthor(String author);
-    Book findById(String id);
 
 }

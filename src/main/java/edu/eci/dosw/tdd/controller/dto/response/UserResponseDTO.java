@@ -1,4 +1,4 @@
-package edu.eci.dosw.tdd.core.model;
+package edu.eci.dosw.tdd.controller.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
@@ -6,11 +6,10 @@ import org.springframework.data.annotation.Id;
 
 @Data
 @Builder
-public class User {
+public class UserResponseDTO {
 
     private String name;
-
-    @Id
     private String id;
+
 
 }

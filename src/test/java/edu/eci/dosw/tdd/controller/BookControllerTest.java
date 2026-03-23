@@ -1,28 +1,10 @@
 package edu.eci.dosw.tdd.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.eci.dosw.tdd.controller.dto.BookDTO;
 import edu.eci.dosw.tdd.controller.mapper.BookMapper;
-import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
-import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
 import edu.eci.dosw.tdd.core.exception.GlobalExceptionHandler;
-import edu.eci.dosw.tdd.core.model.Book;
-import edu.eci.dosw.tdd.core.service.BookService;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.List;
-
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Controller-layer tests for BookController using @WebMvcTest.

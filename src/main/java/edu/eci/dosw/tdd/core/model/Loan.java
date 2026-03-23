@@ -1,6 +1,5 @@
 package edu.eci.dosw.tdd.core.model;
 
-import ch.qos.logback.core.status.Status;
 import lombok.Builder;
 import lombok.Data;
 
