@@ -1,19 +1,17 @@
 package edu.eci.dosw.tdd.core.validator;
 
-import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
-import edu.eci.dosw.tdd.core.repository.UserRepository;
+import edu.eci.dosw.tdd.core.model.User;
 import edu.eci.dosw.tdd.core.util.ValidationUtil;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class UserValidator {
 
-    private final UserRepository userRepository;
-
-    public void validate(String name) {
-        ValidationUtil.requireNonNull(name, "The name");
+    public void validate(User user) {
+        ValidationUtil.validateNotNull(user, "El usuario no puede ser nulo");
+        ValidationUtil.validateNotBlank(user.getId(), "El ID del usuario no puede estar vacío");
+        ValidationUtil.validateNotBlank(user.getName(), "El nombre no puede estar vacío");
+        ValidationUtil.validateNotNull(user.getRole(), "El rol del usuario no puede ser nulo");
     }
 
 }

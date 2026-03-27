@@ -1,85 +1,116 @@
+
 package edu.eci.dosw.tdd.core.service;
 
-import edu.eci.dosw.tdd.controller.dto.request.LoanRequestDTO;
-import edu.eci.dosw.tdd.controller.dto.response.LoanResponseDTO;
-import edu.eci.dosw.tdd.controller.mapper.LoanMapper;
-import edu.eci.dosw.tdd.core.exception.*;
-import edu.eci.dosw.tdd.core.model.Book;
+import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
 import edu.eci.dosw.tdd.core.model.Loan;
-import edu.eci.dosw.tdd.core.model.enums.Status;
-import edu.eci.dosw.tdd.core.model.User;
-import edu.eci.dosw.tdd.core.repository.BookRepository;
-import edu.eci.dosw.tdd.core.repository.LoanRepository;
-import edu.eci.dosw.tdd.core.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import edu.eci.dosw.tdd.core.model.Status;
+import edu.eci.dosw.tdd.core.util.DateUtil;
+import edu.eci.dosw.tdd.core.validator.LoanValidator;
+import edu.eci.dosw.tdd.persistence.entity.BookEntity;
+import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
+import edu.eci.dosw.tdd.persistence.entity.UserEntity;
+import edu.eci.dosw.tdd.persistence.mapper.LoanPersistenceMapper;
+import edu.eci.dosw.tdd.persistence.repository.BookRepository;
+import edu.eci.dosw.tdd.persistence.repository.LoanRepository;
+import edu.eci.dosw.tdd.persistence.repository.UserRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class LoanService {
 
     private final LoanRepository loanRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
-    private final LoanMapper loanMapper;
+    private final LoanPersistenceMapper loanMapper;
+    private final LoanValidator loanValidator;
 
-    @Transactional
-    public LoanResponseDTO createLoan(LoanRequestDTO dto) {
+    public LoanService(LoanRepository loanRepository,
+                       BookRepository bookRepository,
+                       UserRepository userRepository,
+                       LoanPersistenceMapper loanMapper,
+                       LoanValidator loanValidator) {
+        this.loanRepository = loanRepository;
+        this.bookRepository = bookRepository;
+        this.userRepository = userRepository;
+        this.loanMapper = loanMapper;
+        this.loanValidator = loanValidator;
+    }
 
-        // Verificar que el usuario existe
-        User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado con id: " + dto.getUserId()));
+    public Loan createLoan(String bookId, String userId) {
+        loanValidator.validateIds(bookId, userId);
 
-        // Verificar que el libro existe
-        Book book = bookRepository.findById(dto.getBookId())
-                .orElseThrow(() -> new BookNotFoundException("Libro no encontrado con id: " + dto.getBookId()));
+        BookEntity book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new BookNotFoundException("Libro no encontrado con ID: " + bookId));
 
-        // Verificar que el usuario no tenga un préstamo activo
-        boolean tienePrestamoActivo = loanRepository.existsByUserIdAndStatus(dto.getUserId(), Status.ACTIVE);
-        if (tienePrestamoActivo) {
-            throw new LoanLimitExceededException("El usuario ya tiene un préstamo activo");
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + userId));
+
+        loanValidator.validateBookAvailable(book.getAvailableCopies());
+
+        book.setAvailableCopies(book.getAvailableCopies() - 1);
+        bookRepository.save(book);
+
+        LoanEntity loan = new LoanEntity(null, user, book, DateUtil.today(), null, Status.ACTIVE.name());
+        return loanMapper.toModel(loanRepository.save(loan));
+    }
+
+    public Loan returnBook(String bookId, String userId) {
+        loanValidator.validateIds(bookId, userId);
+
+        LoanEntity loanEntity = loanRepository
+                .findByBookIdAndUserIdAndStatus(bookId, userId, Status.ACTIVE.name())
+                .orElseThrow(() -> new RuntimeException("Préstamo activo no encontrado para el libro y usuario indicados"));
+
+        loanValidator.validateActiveLoan(loanMapper.toModel(loanEntity));
+
+        loanEntity.setStatus(Status.RETURNED.name());
+        loanEntity.setReturnDate(DateUtil.today());
+
+        BookEntity book = loanEntity.getBook();
+        book.setAvailableCopies(book.getAvailableCopies() + 1);
+        bookRepository.save(book);
+
+        return loanMapper.toModel(loanRepository.save(loanEntity));
+    }
+
+    public List<Loan> getAllLoans() {
+        return loanRepository.findAll()
+                .stream()
+                .map(loanMapper::toModel)
+                .collect(Collectors.toList());
+    }
+
+    public List<Loan> getLoansByUser(String userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Usuario no encontrado con ID: " + userId);
         }
-
-        // Crear el préstamo
-        Loan loan = Loan.builder()
-                .book(book)
-                .user(user)
-                .loanDate(LocalDate.now())
-                .status(Status.ACTIVE)
-                .build();
-
-        Loan savedLoan = loanRepository.save(loan);
-        return loanMapper.toDto(savedLoan);
+        return loanRepository.findByUserId(userId)
+                .stream()
+                .map(loanMapper::toModel)
+                .collect(Collectors.toList());
     }
 
-    @Transactional
-    public LoanResponseDTO updateLoan(String userId, LoanRequestDTO dto) {
-        Loan loan = loanRepository.findByUserId(userId)
-                .orElseThrow(() -> new LoanNotFoundException("Préstamo no encontrado para el usuario: " + userId));
-
-        Book book = bookRepository.findById(dto.getBookId())
-                .orElseThrow(() -> new BookNotFoundException("Libro no encontrado con id: " + dto.getBookId()));
-
-        loan.setBook(book);
-
-        Loan updatedLoan = loanRepository.save(loan);
-        return loanMapper.toDto(updatedLoan);
+    public List<Loan> getLoansByBook(String bookId) {
+        if (!bookRepository.existsById(bookId)) {
+            throw new BookNotFoundException("Libro no encontrado con ID: " + bookId);
+        }
+        return loanRepository.findByBookId(bookId)
+                .stream()
+                .map(loanMapper::toModel)
+                .collect(Collectors.toList());
     }
 
-    public List<LoanResponseDTO> findActiveLoans() {
-        return loanRepository.findByStatus(Status.ACTIVE).stream()
-                .map(loanMapper::toDto)
-                .toList();
-    }
+    public Loan expireLoan(String bookId, String userId) {
+        loanValidator.validateIds(bookId, userId);
 
-    public List<LoanResponseDTO> findLoanHistory() {
-        return loanRepository.findAll().stream()
-                .map(loanMapper::toDto)
-                .toList();
-    }
+        LoanEntity loanEntity = loanRepository
+                .findByBookIdAndUserIdAndStatus(bookId, userId, Status.ACTIVE.name())
+                .orElseThrow(() -> new RuntimeException("Préstamo activo no encontrado"));
 
+        loanEntity.setStatus(Status.EXPIRED.name());
+        return loanMapper.toModel(loanRepository.save(loanEntity));
+    }
 }
