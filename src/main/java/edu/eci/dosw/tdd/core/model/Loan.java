@@ -1,5 +1,6 @@
 package edu.eci.dosw.tdd.core.model;
 
+import edu.eci.dosw.tdd.core.model.enums.Status;
 import lombok.Builder;
 import lombok.Data;
 

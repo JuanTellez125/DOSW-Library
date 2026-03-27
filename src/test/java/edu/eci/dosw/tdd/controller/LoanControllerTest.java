@@ -5,7 +5,7 @@ import edu.eci.dosw.tdd.controller.dto.request.LoanRequestDTO;
 import edu.eci.dosw.tdd.controller.dto.response.LoanResponseDTO;
 import edu.eci.dosw.tdd.core.exception.GlobalExceptionHandler;
 import edu.eci.dosw.tdd.core.exception.LoanLimitExceededException;
-import edu.eci.dosw.tdd.core.model.Status;
+import edu.eci.dosw.tdd.core.model.enums.Status;
 import edu.eci.dosw.tdd.core.service.LoanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

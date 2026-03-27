@@ -1,6 +1,6 @@
 package edu.eci.dosw.tdd.controller.dto.response;
 
-import edu.eci.dosw.tdd.core.model.Status;
+import edu.eci.dosw.tdd.core.model.enums.Status;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

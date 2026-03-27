@@ -1,48 +1,98 @@
 package edu.eci.dosw.tdd.controller;
 
-import edu.eci.dosw.tdd.controller.dto.request.UserRequestDTO;
-import edu.eci.dosw.tdd.controller.dto.response.UserResponseDTO;
+import edu.eci.dosw.tdd.controller.dto.UserDTO;
+import edu.eci.dosw.tdd.controller.mapper.UserMapper;
+import edu.eci.dosw.tdd.core.model.User;
 import edu.eci.dosw.tdd.core.service.UserService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
+@Tag(name = "Users", description = "Operaciones para gestión de usuarios")
 @RestController
-@RequestMapping("/api/users")
-@RequiredArgsConstructor
+@RequestMapping("/users")
 public class UserController {
 
     private final UserService userService;
+    private final UserMapper userMapper;
 
+    public UserController(UserService userService, UserMapper userMapper) {
+        this.userService = userService;
+        this.userMapper = userMapper;
+    }
+
+    @Operation(summary = "Registrar un usuario")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Usuario registrado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o username ya en uso")
+    })
     @PostMapping
-    public ResponseEntity<UserResponseDTO> createUser(@RequestBody @Valid UserRequestDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(dto));
+    public ResponseEntity<Void> registerUser(@RequestBody UserDTO userDTO) {
+        User user = userMapper.toModel(userDTO);
+        userService.registerUser(user);
+        return ResponseEntity.status(201).build();
     }
 
+    @Operation(summary = "Login")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Login exitoso"),
+            @ApiResponse(responseCode = "400", description = "Credenciales inválidas")
+    })
+    @PostMapping("/login")
+    public ResponseEntity<UserDTO> login(@RequestParam String username,
+                                         @RequestParam String password) {
+        User user = userService.login(username, password);
+        return ResponseEntity.ok(userMapper.toDTO(user));
+    }
+
+    @Operation(summary = "Obtener todos los usuarios")
+    @ApiResponse(responseCode = "200", description = "Lista retornada exitosamente")
+    @GetMapping
+    public ResponseEntity<List<UserDTO>> getAllUsers() {
+        List<UserDTO> result = userService.getAllUsers()
+                .stream()
+                .map(userMapper::toDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    @Operation(summary = "Obtener usuario por ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDTO> getUserById(@PathVariable String id) {
+        return ResponseEntity.ok(userMapper.toDTO(userService.getUserById(id)));
+    }
+
+    @Operation(summary = "Actualizar usuario")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Usuario actualizado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable String id,
-                                                      @RequestBody @Valid UserRequestDTO dto) {
-        return ResponseEntity.ok(userService.updateUser(id, dto));
+    public ResponseEntity<Void> updateUser(@PathVariable String id,
+                                           @RequestBody UserDTO updatedUserDTO) {
+        User updatedUser = userMapper.toModel(updatedUserDTO);
+        userService.updateUser(id, updatedUser);
+        return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Eliminar usuario")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Usuario eliminado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Usuario no encontrado")
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<UserResponseDTO> findUserById(@PathVariable String id) {
-        return ResponseEntity.ok(userService.findUserById(id));
-    }
-
-    @GetMapping
-    public ResponseEntity<List<UserResponseDTO>> findAllUsers() {
-        return ResponseEntity.ok(userService.findAllUsers());
-    }
-
 }
