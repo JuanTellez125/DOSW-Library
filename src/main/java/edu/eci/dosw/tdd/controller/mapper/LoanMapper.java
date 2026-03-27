@@ -2,15 +2,20 @@ package edu.eci.dosw.tdd.controller.mapper;
 
 import edu.eci.dosw.tdd.controller.dto.response.LoanResponseDTO;
 import edu.eci.dosw.tdd.core.model.Loan;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import org.springframework.stereotype.Component;
 
-@Mapper(componentModel = "spring")
-public interface LoanMapper {
+@Component
+public class LoanMapper {
 
-    @Mapping(source = "user.name", target = "userName")
-    @Mapping(source = "book.title", target = "bookTitle")
-    @Mapping(source = "book.author", target = "bookAuthor")
-    LoanResponseDTO toDto(Loan loan);
-
+    public LoanResponseDTO toDTO(Loan loan) {
+        return new LoanResponseDTO(
+                loan.getBook().getId(),
+                loan.getBook().getTitle(),
+                loan.getUser().getId(),
+                loan.getUser().getUsername(),
+                loan.getLoanDate(),
+                loan.getReturnDate(),
+                loan.getStatus()
+        );
+    }
 }

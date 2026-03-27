@@ -1,7 +1,7 @@
 package edu.eci.dosw.tdd.persistence.mapper;
 
 import edu.eci.dosw.tdd.core.model.Loan;
-import edu.eci.dosw.tdd.core.model.Status;
+import edu.eci.dosw.tdd.core.model.enums.Status;
 import edu.eci.dosw.tdd.persistence.entity.LoanEntity;
 import org.springframework.stereotype.Component;
 

@@ -1,43 +1,86 @@
 package edu.eci.dosw.tdd.controller;
 
-import edu.eci.dosw.tdd.controller.dto.request.BookRequestDTO;
-import edu.eci.dosw.tdd.controller.dto.response.BookResponseDTO;
+import edu.eci.dosw.tdd.controller.dto.BookDTO;
+import edu.eci.dosw.tdd.controller.mapper.BookMapper;
+import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.service.BookService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
+@Tag(name = "Books", description = "Operaciones para gestión de libros")
 @RestController
-@RequestMapping("/api/books")
-@RequiredArgsConstructor
+@RequestMapping("/books")
 public class BookController {
 
     private final BookService bookService;
+    private final BookMapper bookMapper;
 
+    public BookController(BookService bookService, BookMapper bookMapper) {
+        this.bookService = bookService;
+        this.bookMapper = bookMapper;
+    }
+
+    @Operation(summary = "Agregar un libro")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Libro creado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Datos del libro inválidos")
+    })
     @PostMapping
-    public ResponseEntity<BookResponseDTO> createBook(@RequestBody @Valid BookRequestDTO dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(bookService.createBook(dto));
+    public ResponseEntity<Void> addBook(@RequestBody BookDTO bookDTO) {
+        Book book = bookMapper.toModel(bookDTO);
+        bookService.addBook(book);
+        return ResponseEntity.status(201).build();
     }
 
-    @PutMapping("/{title}")
-    public ResponseEntity<BookResponseDTO> updateBook(@PathVariable String title,
-                                                      @RequestBody @Valid BookRequestDTO dto) {
-        return ResponseEntity.ok(bookService.updateBook(title, dto));
+    @Operation(summary = "Obtener todos los libros")
+    @ApiResponse(responseCode = "200", description = "Lista de libros retornada exitosamente")
+    @GetMapping
+    public ResponseEntity<List<BookDTO>> getAllBooks() {
+        List<BookDTO> result = bookService.getAllBooks()
+                .stream()
+                .map(bookMapper::toDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 
+    @Operation(summary = "Obtener libro por ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Libro encontrado"),
+            @ApiResponse(responseCode = "404", description = "Libro no encontrado")
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<BookDTO> getBookById(@PathVariable String id) {
+        return ResponseEntity.ok(bookMapper.toDTO(bookService.getBookById(id)));
+    }
+
+    @Operation(summary = "Actualizar stock total del libro")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Stock actualizado exitosamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+            @ApiResponse(responseCode = "404", description = "Libro no encontrado")
+    })
+    @PutMapping("/{id}/stock")
+    public ResponseEntity<Void> updateStock(@PathVariable String id,
+                                            @RequestParam int totalCopies) {
+        bookService.updateTotalCopies(id, totalCopies);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Eliminar un libro")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Libro eliminado exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Libro no encontrado")
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBook(@PathVariable String id) {
         bookService.deleteBook(id);
         return ResponseEntity.noContent().build();
     }
-
-    @GetMapping
-    public ResponseEntity<List<BookResponseDTO>> findAllBooks() {
-        return ResponseEntity.ok(bookService.findAllBooks());
-    }
-
 }

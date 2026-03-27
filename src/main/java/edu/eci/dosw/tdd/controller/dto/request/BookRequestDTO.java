@@ -8,10 +8,18 @@ import lombok.Data;
 @Builder
 public class BookRequestDTO {
 
-    @NotNull(message = "El titulo es obligatorio")
+    @NotNull
+    private String id;
+
+    @NotNull
     private String title;
 
-    @NotNull(message = "El autor es obligatorio")
+    @NotNull
     private String author;
 
+    @NotNull
+    private int totalCopies;
+
+    @NotNull
+    private int availableCopies;
 }

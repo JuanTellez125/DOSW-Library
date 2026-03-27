@@ -1,7 +1,7 @@
 
 package edu.eci.dosw.tdd.persistence.mapper;
 
-import edu.eci.dosw.tdd.core.model.Role;
+import edu.eci.dosw.tdd.core.model.enums.Role;
 import edu.eci.dosw.tdd.core.model.User;
 import edu.eci.dosw.tdd.persistence.entity.UserEntity;
 import org.springframework.stereotype.Component;

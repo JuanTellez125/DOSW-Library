@@ -1,20 +1,21 @@
 package edu.eci.dosw.tdd.core.model;
 
-import com.sun.source.tree.LambdaExpressionTree;
+import jakarta.persistence.Id;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.NoArgsConstructor;
 
-@Document(collection = "books")
 @Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class Book {
-
-    private String title;
-    private String author;
 
     @Id
     private String id;
-
+    private String title;
+    private String author;
+    private int totalCopies;
+    private int availableCopies;
 }
