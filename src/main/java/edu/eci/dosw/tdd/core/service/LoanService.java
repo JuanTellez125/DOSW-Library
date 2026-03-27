@@ -6,7 +6,7 @@ import edu.eci.dosw.tdd.controller.mapper.LoanMapper;
 import edu.eci.dosw.tdd.core.exception.*;
 import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.model.Loan;
-import edu.eci.dosw.tdd.core.model.Status;
+import edu.eci.dosw.tdd.core.model.enums.Status;
 import edu.eci.dosw.tdd.core.model.User;
 import edu.eci.dosw.tdd.core.repository.BookRepository;
 import edu.eci.dosw.tdd.core.repository.LoanRepository;

@@ -1,7 +1,7 @@
 package edu.eci.dosw.tdd.core.repository;
 
 import edu.eci.dosw.tdd.core.model.Loan;
-import edu.eci.dosw.tdd.core.model.Status;
+import edu.eci.dosw.tdd.core.model.enums.Status;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
