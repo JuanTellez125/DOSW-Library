@@ -11,8 +11,8 @@ import lombok.Data;
 public class LoanRequestDTO {
 
     @NotNull(message = "The user ID cannot be blank")
-    private String userId;
+    private Long userId;
 
     @NotNull(message = "The book id cannot be blank")
-    private String bookId;
+    private Long bookId;
 }

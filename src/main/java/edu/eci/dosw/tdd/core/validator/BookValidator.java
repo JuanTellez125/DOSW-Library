@@ -1,8 +1,7 @@
 package edu.eci.dosw.tdd.core.validator;
 
-import edu.eci.dosw.tdd.core.repository.BookRepository;
+import edu.eci.dosw.tdd.persistence.relational.repository.BookRepository;
 import edu.eci.dosw.tdd.core.util.ValidationUtil;
-import edu.eci.dosw.tdd.core.exception.BookNotAvailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

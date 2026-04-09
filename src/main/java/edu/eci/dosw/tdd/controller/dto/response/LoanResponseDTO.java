@@ -14,6 +14,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class LoanResponseDTO {
 
+    private Long loanId;
     private String userName;
     private String bookTitle;
     private String bookAuthor;

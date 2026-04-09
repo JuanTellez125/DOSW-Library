@@ -5,7 +5,7 @@ import edu.eci.dosw.tdd.controller.dto.response.BookResponseDTO;
 import edu.eci.dosw.tdd.controller.mapper.BookMapper;
 import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
 import edu.eci.dosw.tdd.core.model.Book;
-import edu.eci.dosw.tdd.core.repository.BookRepository;
+import edu.eci.dosw.tdd.persistence.relational.repository.BookRepository;
 import edu.eci.dosw.tdd.core.service.BookService;
 import edu.eci.dosw.tdd.core.validator.BookValidator;
 import org.junit.jupiter.api.BeforeEach;

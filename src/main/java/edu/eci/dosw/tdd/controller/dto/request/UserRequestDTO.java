@@ -9,6 +9,6 @@ import lombok.Data;
 public class UserRequestDTO {
 
     @NotNull(message = "Name cannot be blank")
-    public String name;
+    public String userName;
 
 }

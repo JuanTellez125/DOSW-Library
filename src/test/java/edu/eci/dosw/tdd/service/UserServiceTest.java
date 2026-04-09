@@ -5,7 +5,7 @@ import edu.eci.dosw.tdd.controller.dto.response.UserResponseDTO;
 import edu.eci.dosw.tdd.controller.mapper.UserMapper;
 import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
 import edu.eci.dosw.tdd.core.model.User;
-import edu.eci.dosw.tdd.core.repository.UserRepository;
+import edu.eci.dosw.tdd.persistence.relational.repository.UserRepository;
 import edu.eci.dosw.tdd.core.service.UserService;
 import edu.eci.dosw.tdd.core.validator.UserValidator;
 import org.junit.jupiter.api.BeforeEach;

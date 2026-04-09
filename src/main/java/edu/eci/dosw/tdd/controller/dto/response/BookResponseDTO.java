@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BookResponseDTO {
 
-    private String id;
-    private String title;
+    private Long bookId;
+    private String bookTitle;
     private String author;
 
 }

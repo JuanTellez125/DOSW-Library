@@ -1,7 +1,7 @@
-package edu.eci.dosw.tdd.core.model;
+package edu.eci.dosw.tdd.persistence.relational.entity;
 
 import edu.eci.dosw.tdd.core.model.enums.BookType;
-import edu.eci.dosw.tdd.core.model.enums.MemberShip;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,18 +13,25 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Book {
+@Entity
+@Table(name = "books")
+public class BookRelationalEntity {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long bookId;
+
     private String title;
     private String author;
-    private String email;
     private String category;
+
+    @Enumerated(EnumType.STRING)
     private BookType type;
+
     private LocalDate releaseDate;
     private String isbn;
     private LocalDate registerDate;
+
     private Integer totalCopies;
     private Integer availableCopies;
-
 }
