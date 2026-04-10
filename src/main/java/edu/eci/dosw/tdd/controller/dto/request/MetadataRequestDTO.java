@@ -1,4 +1,4 @@
-package edu.eci.dosw.tdd.controller.dto.response;
+package edu.eci.dosw.tdd.controller.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -7,10 +7,8 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class BookResponseDTO {
-
-
+@NoArgsConstructor
+public class MetadataRequestDTO {
 
 }

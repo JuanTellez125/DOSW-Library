@@ -1,6 +1,5 @@
 package edu.eci.dosw.tdd.controller.dto.request;
 
-import edu.eci.dosw.tdd.core.model.enums.BookType;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -15,14 +15,19 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class BookRequestDTO {
 
-    @NotNull(message = "Book's title cannot be blank")
+    @NotNull(message = "Title no puede estar vacio")
     private String title;
+
+    @NotNull(message = "Author no puede estar vacio")
     private String author;
-    private String email;
-    private String category;
-    private BookType type;
+
+    @NotNull(message = "Total copies no puede estar vacio")
+    private int totalCopies;
+
+    private List<String> categories;
+    private String publicationType;
     private LocalDate releaseDate;
     private String isbn;
-    private LocalDate registerDate;
+    private MetadataRequestDTO metadata;
 
 }

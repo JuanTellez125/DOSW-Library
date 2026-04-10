@@ -1,6 +1,5 @@
 package edu.eci.dosw.tdd.persistence.relational.entity;
 
-import edu.eci.dosw.tdd.core.model.enums.BookType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

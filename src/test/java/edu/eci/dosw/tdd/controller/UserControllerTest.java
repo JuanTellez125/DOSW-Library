@@ -3,7 +3,6 @@ package edu.eci.dosw.tdd.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.eci.dosw.tdd.controller.dto.request.UserRequestDTO;
 import edu.eci.dosw.tdd.controller.dto.response.UserResponseDTO;
-import edu.eci.dosw.tdd.core.exception.GlobalExceptionHandler;
 import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
 import edu.eci.dosw.tdd.core.service.UserService;
 import org.junit.jupiter.api.BeforeEach;

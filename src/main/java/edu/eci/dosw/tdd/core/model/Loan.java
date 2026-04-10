@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.util.List;
 
 import java.time.LocalDate;
 
@@ -14,13 +15,13 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class Loan {
 
-    private Long loanId;
+    private String loanId;
     private Book book;
     private User user;
     private LocalDate loanDate;
     private Status status;
     private LocalDate returnDate;
 
-
+    private List<LoanHistory> history;
 
 }

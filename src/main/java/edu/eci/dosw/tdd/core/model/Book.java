@@ -1,13 +1,14 @@
 package edu.eci.dosw.tdd.core.model;
 
-import edu.eci.dosw.tdd.core.model.enums.BookType;
-import edu.eci.dosw.tdd.core.model.enums.MemberShip;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -18,13 +19,17 @@ public class Book {
     private Long bookId;
     private String title;
     private String author;
-    private String email;
-    private String category;
-    private BookType type;
+    private int totalCopies;
+    private int availableCopies;
+    private List<String> categories;
+    private String publicationType;
     private LocalDate releaseDate;
     private String isbn;
+
+    private Metadata metadata;
+
+    private String availabilityStatus;
+    private int borrowedCopies;
     private LocalDate registerDate;
-    private Integer totalCopies;
-    private Integer availableCopies;
 
 }

@@ -4,7 +4,6 @@ import edu.eci.dosw.tdd.controller.dto.request.LoanRequestDTO;
 import edu.eci.dosw.tdd.controller.dto.response.LoanResponseDTO;
 import edu.eci.dosw.tdd.controller.mapper.LoanMapper;
 import edu.eci.dosw.tdd.core.exception.BookNotFoundException;
-import edu.eci.dosw.tdd.core.exception.LoanLimitExceededException;
 import edu.eci.dosw.tdd.core.exception.UserNotFoundException;
 import edu.eci.dosw.tdd.core.model.Book;
 import edu.eci.dosw.tdd.core.model.Loan;

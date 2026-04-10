@@ -20,7 +20,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class LoanService {
+public class  LoanService {
 
     private final LoanRepository loanRepository;
     private final BookRepository bookRepository;
